@@ -34,23 +34,86 @@ module TinyLang4 = {
       | Leq => "<="
       | _ => assert false 
       }
-
+      let primary_sub_str = (arg: expr) : string => switch arg {
+        | Prim(_, _) => "(" ++ humanReadable(arg) ++ ")"
+        | _ => humanReadable(arg)
+      }
       if (Belt.List.length(args) == 2) {
-        let arg1 = humanReadable(args->Belt.List.getExn(0))
-        let arg2 = humanReadable(args->Belt.List.getExn(1))
-        "(" ++ arg1 ++ " " ++ primary ++ " " ++ arg2 ++ ")"
+        let arg1 = args->Belt.List.getExn(0)
+        let arg2 = args->Belt.List.getExn(1)
+        primary_sub_str(arg1) ++ " " ++ primary ++ " " ++ primary_sub_str(arg2) 
       }
       else {
         argListString(list{primary, ...args->Belt.List.map(humanReadable)})
       }
     }
-    | If (cond, bTrue, bFalse) => "if " ++ "(" ++ humanReadable(cond) ++ ")" 
+    | If (cond, bTrue, bFalse) => "if " ++ humanReadable(cond) 
       ++ " then " ++ "{" ++ humanReadable(bTrue) ++ "}" 
       ++ " else " ++ "{" ++ humanReadable(bFalse) ++ "}"
     }
     humanReadable(expr)
   }
 
+  type rec value = 
+    | Vint (int)
+    | Vclosure (env, list<string>, expr)
+  and env = list<(string, value)>
+  let vadd = (v1, v2) : value => switch (v1,v2) {
+    | (Vint(i), Vint(j)) => Vint(i+j)
+    | _ => assert false 
+  }
+  let vmul = (v1, v2) : value => switch (v1,v2) {
+    | (Vint(i), Vint(j)) => Vint(i*j)
+    | _ => assert false 
+  }
+  let vleq = (v1, v2) : value => switch (v1,v2) {
+    | (Vint(i), Vint(j)) => Vint(i <= j ? 1 : 0)
+    | _ => assert false 
+  }
+  let eval = (expr: expr): int => {
+    let rec evalHelper = (expr:expr, env: env) : value => switch expr {
+      | Cst(i) => Vint(i)
+      | Prim(p, es) => {
+        let v1 = evalHelper(es->Belt.List.getExn(0),env)
+        let v2 = evalHelper(es->Belt.List.getExn(1),env)
+        switch p {
+          | Add => vadd(v1,v2)
+          | Mul => vmul(v1,v2)
+          | Leq => vleq(v1,v2)
+          | _ => assert false 
+        }
+      }
+      | Var(x) => switch Belt.List.getAssoc(env, x, (a,b)=>a==b) {
+        | Some(v) => v 
+        | _ => assert false  
+      }
+      | Let(vname, def, app) => evalHelper(app, list{(vname,evalHelper(def, env)), ...env})
+      | Letfn(fn, args, body, app) => {
+        let closure = Vclosure(env, args, body)
+        evalHelper(app, list{(fn, closure), ...env})
+      }
+      | App(fn, args) => {
+        let Vclosure(env_closure, args_closure, body) = switch Belt.List.getAssoc(env, fn, (a,b)=>a==b) {
+          | Some(v) => v 
+          | _ => assert false 
+        }
+        let params = args->Belt.List.map((e)=> evalHelper(e, env))
+        let fun_env = Belt.List.concatMany([Belt.List.zip(args_closure, params), env])
+        evalHelper(body, fun_env)
+      }
+      | If(cond, bTrue, bFalse) => {
+        let Vint(c) = evalHelper(cond, env)
+        if c == 0 {
+          evalHelper(bFalse, env)
+        } 
+        else {
+          evalHelper(bTrue, env)
+        }
+      }
+    }
+    let Vint(retval) = evalHelper(expr, list{})
+    retval 
+  }
 }
 
 module Flat = {
@@ -83,17 +146,20 @@ module Flat = {
       | Leq => "<="
       | _ => assert false 
       }
-
+      let primary_sub_str = (arg: expr) : string => switch arg {
+        | Prim(_, _) => "(" ++ humanReadable(arg) ++ ")"
+        | _ => humanReadable(arg)
+      }
       if (Belt.List.length(args) == 2) {
-        let arg1 = humanReadable(args->Belt.List.getExn(0))
-        let arg2 = humanReadable(args->Belt.List.getExn(1))
-        "(" ++ arg1 ++ " " ++ primary ++ " " ++ arg2 ++ ")"
+        let arg1 = args->Belt.List.getExn(0)
+        let arg2 = args->Belt.List.getExn(1)
+        primary_sub_str(arg1) ++ " " ++ primary ++ " " ++ primary_sub_str(arg2) 
       }
       else {
         argListString(list{primary, ...args->Belt.List.map(humanReadable)})
       }
     }
-    | If (cond, bTrue, bFalse) => "if " ++ "(" ++ humanReadable(cond) ++ ")" 
+    | If (cond, bTrue, bFalse) => "if " ++ humanReadable(cond) 
       ++ " then " ++ "{" ++ humanReadable(bTrue) ++ "}" 
       ++ " else " ++ "{" ++ humanReadable(bFalse) ++ "}"
     }
@@ -250,8 +316,6 @@ module Compile = {
   let compile = (expr: expr) : list<instr> => { 
     let funs = preprocess(expr)
     let funs_code = Belt.List.concatMany(funs->Belt.List.map(compile_fun)->Belt.List.toArray)
-
-    Js.log(toString(funs))
 
     list{
       Call("main",0),

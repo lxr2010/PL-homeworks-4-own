@@ -26,12 +26,16 @@ module Test = {
 
   let test = {
     let unitTest = (expr: Lang.expr) => {
+      Js.log("---")
       Js.log(Lang.toString(expr))
+      let evaluated = Lang.eval(expr)
+      Js.log("Evaluated to : " ++ Js.Int.toString(evaluated))
       let asm = Comp.compile(expr)->Belt.List.toArray
+      Js.log("Compiles to : ")
       Js.log(Asm.toString(asm))
       let byte = Asm.encode(asm)
+      Js.log("Assembles to stack machine code: ")
       Js.log(byte)
-      byte
     }
     testCases->Belt.List.forEach(unitTest)
   }
