@@ -1,7 +1,7 @@
 module StackMachine = {
   type label = string
 
-  type instr = Cst(int) | Add | Mul | Var(int) | Pop | Swap 
+  type instr = Cst(int) | Add | Mul | Leq | Var(int) | Pop | Swap 
     | Label(label) | Call(label, int) | Ret(int) 
     | Goto(label) | IfZero(label)
     | Exit
@@ -12,6 +12,7 @@ module StackMachine = {
     | Cst(i) => list{"Cst("++Js.Int.toString(i)++")"}
     | Add => list{"Add"}
     | Mul => list{"Mul"}
+    | Leq => list{"Leq"}
     | Var(i) => list{"Var("++Js.Int.toString(i)++")"}
     | Pop => list{"Pop"}
     | Swap => list{"Swap"}
@@ -112,6 +113,9 @@ module StackMachine = {
       | Exit => {
         int_code[position.contents] = 10
       }
+      | Leq => {
+        int_code[position.contents] = 11
+      }
       | Label(_) => {
         assert true
       }
@@ -122,14 +126,14 @@ module StackMachine = {
     int_code 
   }
   
-  let cst_test = [Cst(2),Exit]
-  let call_test = [Call("func",0),Exit,Label("func"),Cst(15)]
-  let call_test2 = [Cst(2),Cst(3),Cst(5),Call("addmul",3),Exit,Label("addmul"),Var(2),Var(2),Add,Var(1),Mul,Ret(3)]
+  // let cst_test = [Cst(2),Exit]
+  // let call_test = [Call("func",0),Exit,Label("func"),Cst(15)]
+  // let call_test2 = [Cst(2),Cst(3),Cst(5),Call("addmul",3),Exit,Label("addmul"),Var(2),Var(2),Add,Var(1),Mul,Ret(3)]
   
-  let test = (instrs) => {
-    Js.log(toString(instrs))
-    Js.log(encode(instrs))
-  }
+  // let test = (instrs) => {
+  //   Js.log(toString(instrs))
+  //   Js.log(encode(instrs))
+  // }
 };
 
-let _ = StackMachine.test(StackMachine.call_test2)
+// let _ = StackMachine.test(StackMachine.call_test2)
